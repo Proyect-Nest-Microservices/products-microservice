@@ -56,6 +56,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   async update(id: number, updateProductDto: UpdateProductDto) {
 
     try {
+      const { id: __, ...data } = updateProductDto;
       
       return await this.product.update({
         where: { id },
