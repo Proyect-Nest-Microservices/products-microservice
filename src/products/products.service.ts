@@ -1,9 +1,8 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit, Query } from '@nestjs/common';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { extend } from 'joi';
-import { PrismaClient } from '@prisma/client';
+import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PaginationDto } from 'src/common';
+import { CreateProductDto, UpdateProductDto } from './dto';
 
 @Injectable()
 export class ProductsService extends PrismaClient implements OnModuleInit {
@@ -36,7 +35,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
       meta: {
         total: totalProducts,
         page: page,
-        lastPage:lastPage
+        lastPage:lastPage 
       }
     }
   }
@@ -47,7 +46,10 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     });
 
     if (!product) {
-      throw new NotFoundException(`Product with id ${id} not found`)
+      throw new RpcException({
+        message: `Product with id ${id} not found`,
+        status: HttpStatus.BAD_REQUEST
+      })
     }
 
     return product;
@@ -63,7 +65,10 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
         data: updateProductDto
       })
     } catch (error) {
-      throw new NotFoundException(`Product with id ${id} not found`)
+      throw new RpcException({
+        message: `Product with id ${id} not found`,
+        status:HttpStatus.NOT_FOUND
+      })
     }
 
   }
@@ -78,8 +83,37 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
         }
       })
     } catch (error) {
-      throw new NotFoundException(`Product with id ${id} not found ${error}`)
-
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        // Producto no encontrado
+        throw new RpcException({
+          message: `Product with id ${id} not found`,
+          status: HttpStatus.NOT_FOUND
+        });
+      } else {
+        // Otros errores
+        throw new RpcException({
+          message: `An error occurred while trying to update the product: ${error.message}`,
+          status: HttpStatus.INTERNAL_SERVER_ERROR
+        });
+      }
     }
+  }
+
+  async validateProduct(ids: number[]) {
+    const idsSet = Array.from(new Set(ids));
+    const products = await this.product.findMany({
+      where: {
+        id: { in: idsSet }
+      }
+    });
+
+    if (products.length != idsSet.length) {
+      throw new RpcException({
+        message: 'Some products were not found',
+        status: HttpStatus.BAD_REQUEST
+      })
+    }
+
+    return products;
   }
 }
