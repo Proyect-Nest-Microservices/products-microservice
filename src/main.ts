@@ -5,19 +5,19 @@ import { envs } from './config/envs.config';
 import {MicroserviceOptions, Transport} from '@nestjs/microservices'
 
 async function bootstrap() {
+  const logger = new Logger('Main')
+
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule,
     {
-      transport: Transport.TCP,
+      //transport: Transport.TCP, //-> TCP
+      transport: Transport.NATS,
       options: {
-        port:envs.PORT
+        //port:envs.PORT //->  TCP
+        servers:envs.NATS_SERVERS
       }
     }
   );
-
-  const logger = new Logger('Main')
-
-
 
   app.useGlobalPipes(
     new ValidationPipe({
